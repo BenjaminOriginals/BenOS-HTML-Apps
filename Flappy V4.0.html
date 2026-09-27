@@ -421,7 +421,8 @@
             MENU: 0,
             PLAYING: 1,
             PAUSED: 2,
-            GAMEOVER: 3
+            GAMEOVER: 3,
+            READY: 4
         };
 
         // Game State Variables
@@ -629,6 +630,12 @@
                 ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
                 ctx.fill();
 
+                // Wing (Simple white oval)
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.ellipse(-this.radius * 0.2, this.radius * 0.1, this.radius * 0.45, this.radius * 0.3, -Math.PI / 10, 0, Math.PI * 2);
+                ctx.fill();
+
                 // Eye (Vertically stretched, near edge)
                 ctx.fillStyle = '#ffffff';
                 ctx.beginPath();
@@ -820,7 +827,7 @@
         }
 
         function initGame() {
-            currentState = STATE.PLAYING;
+            currentState = STATE.READY; // Transition to hover state, wait for first input
             bird = new Bird();
             pipes = [];
             particles = [];
@@ -919,6 +926,10 @@
                 case STATE.MENU:
                     initGame();
                     break;
+                case STATE.READY:
+                    currentState = STATE.PLAYING;
+                    bird.flap();
+                    break;
                 case STATE.PLAYING:
                     bird.flap();
                     break;
@@ -955,6 +966,7 @@
 
             switch (currentState) {
                 case STATE.MENU:
+                case STATE.READY:
                     if (e.code === 'Space' || e.code === 'ArrowUp') handleActionInput();
                     break;
                 case STATE.PLAYING:
@@ -1016,15 +1028,15 @@
             ctx.fillStyle = sunGrad;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             
-            // Draw Parallax Clouds (Slows on menu, stops completely on game over/pause)
-            const cloudSpeed = (currentState === STATE.PLAYING) ? currentPipeSpeed * 0.2 : (currentState === STATE.MENU ? 0.2 : 0);
+            // Draw Parallax Clouds (Slows on menu/ready, stops completely on game over/pause)
+            const cloudSpeed = (currentState === STATE.PLAYING) ? currentPipeSpeed * 0.2 : ((currentState === STATE.MENU || currentState === STATE.READY) ? 0.2 : 0);
             backgroundClouds.forEach(cloud => {
                 if (currentState !== STATE.PAUSED) cloud.update(cloudSpeed);
                 cloud.draw();
             });
             
             // Draw Jagged Mountains (Stateful, Seamless Wrapping, Stops on death)
-            const mtnSpeed = (currentState === STATE.PLAYING) ? currentPipeSpeed * 0.15 : (currentState === STATE.MENU ? 0.3 : 0);
+            const mtnSpeed = (currentState === STATE.PLAYING) ? currentPipeSpeed * 0.15 : ((currentState === STATE.MENU || currentState === STATE.READY) ? 0.3 : 0);
             
             mountains.forEach((mtn, index) => {
                 if (currentState !== STATE.PAUSED) {
@@ -1104,6 +1116,10 @@
                 }
 
                 bird.update();
+            } else if (currentState === STATE.READY || currentState === STATE.MENU) {
+                // Hover effect while waiting for first input or on menu
+                bird.y = (CANVAS_HEIGHT * 0.5) + Math.sin(frames * 0.08) * 8;
+                bird.targetRotation = 0;
             }
 
             // 3. Update & Draw Pipes
@@ -1163,6 +1179,30 @@
                     bird.velocity += GRAVITY; 
                     bird.y += bird.velocity;
                 }
+                
+                // Draw "Ready" tooltip text after 1.5s (approx 90 frames)
+                if (currentState === STATE.READY && frames > 90) {
+                    ctx.save();
+                    // Fade in smoothly over ~30 frames
+                    const alpha = Math.min(1, (frames - 90) / 30); 
+                    // Add a subtle opacity pulse
+                    const pulse = 0.8 + 0.2 * Math.sin(frames * 0.05); 
+                    
+                    ctx.font = '800 22px Inter, system-ui, sans-serif';
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * pulse})`;
+                    ctx.textAlign = 'center';
+                    
+                    // Strong drop shadow for legibility over the background
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+                    ctx.shadowBlur = 12;
+                    ctx.shadowOffsetY = 3;
+                    
+                    // Position it above the bird and hover smoothly
+                    const textY = bird.y - 55 + Math.sin(frames * 0.08 + Math.PI) * 5;
+                    ctx.fillText("Tap or press space!", bird.x, textY);
+                    
+                    ctx.restore();
+                }
             }
             
             // 6. Post-processing Overlays
@@ -1171,7 +1211,7 @@
             // Animated Lava Ground
             drawLava();
             
-            if (currentState === STATE.PLAYING || currentState === STATE.MENU) {
+            if (currentState === STATE.PLAYING || currentState === STATE.MENU || currentState === STATE.READY) {
                 lavaFrames++;
             }
 
@@ -1219,18 +1259,18 @@
         // Render Recent Scores
         renderRecentScores();
         
-        // Initialize static view for Main Menu
+        // Initialize dynamic view for Main Menu
         initClouds();
         initMountains();
-        bird = new Bird(); // Dummy bird for aesthetics
-        drawBackground();
-        bird.draw();
-        drawLava();
+        bird = new Bird();
         
         // Ensure UI buttons have keyboard focus removal (prevents spacebar pressing button twice)
         document.querySelectorAll('button').forEach(b => {
             b.addEventListener('focus', function() { this.blur(); });
         });
+
+        // Start the continuous render loop for the main menu animations
+        loop();
 
     </script>
 </body>
