@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Present</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: '#3b82f6', // Blue-500 for a more standard SaaS feel
+                        primaryHover: '#2563eb', // Blue-600
+                        canvas: '#f3f4f6',
+                        surface: '#ffffff',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { overscroll-behavior-y: none; }
+        
+        .slide-canvas {
+            position: relative;
+            background: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 960px; 
+            height: 540px;
+            overflow: hidden;
+            transform-origin: center center;
+            transition: transform 0.2s ease;
+        }
+
+        .canvas-element {
+            position: absolute;
+            cursor: grab;
+            user-select: none;
+            box-sizing: border-box;
+        }
+        
+        .canvas-element:active { cursor: grabbing; }
+
+        .canvas-element.selected { outline: 2px solid #3b82f6; }
+
+        .canvas-element.selected::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            right: -6px;
+            width: 12px;
+            height: 12px;
+            background: white;
+            border: 2px solid #3b82f6;
+            border-radius: 50%;
+            cursor: se-resize;
+            z-index: 10;
+        }
+
+        .shape-rect { background-color: #cbd5e1; border: 1px solid #94a3b8; }
+        .shape-circle { background-color: #cbd5e1; border: 1px solid #94a3b8; border-radius: 50%; }
+        .shape-triangle {
+            width: 0; height: 0;
+            border-left: 50px solid transparent; border-right: 50px solid transparent; border-bottom: 100px solid #cbd5e1;
+            position: relative;
+            background-color: transparent !important;
+        }
+        
+        .element-image { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        
+        .element-text {
+            width: 100%; height: 100%; padding: 8px;
+            outline: none; overflow: hidden; white-space: pre-wrap; word-wrap: break-word;
+            cursor: default; /* Changed from text to allow dragging, double click to edit */
+        }
+        
+        .element-text:focus { cursor: text; outline: 2px solid rgba(59, 130, 246, 0.5); }
+        .element-text:empty::before { content: "Double-click to edit..."; color: #9ca3af; }
+
+        .thumbnail-container.active { border-color: #3b82f6; background-color: #eff6ff; }
+        
+        .thumbnail-preview {
+            position: relative; background: white; width: 100%; aspect-ratio: 16 / 9;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); border: 1px solid #e5e7eb; overflow: hidden; pointer-events: none;
+        }
+
+        #presentation-mode {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: black; z-index: 9999; justify-content: center; align-items: center;
+        }
+        #presentation-mode.active { display: flex; }
+
+        #presentation-canvas {
+            position: relative; background: white; width: 1920px; height: 1080px;
+            transform-origin: center; overflow: hidden;
+        }
+
+        /* Transitions */
+        .trans-fade { animation: fadeIn 0.5s ease-in-out; }
+        .trans-slide { animation: slideInRight 0.5s ease-out; }
+        
+        /* Entrance Animations */
+        .anim-hidden { opacity: 0 !important; visibility: hidden; }
+        .anim-fade-in { animation: fadeIn 0.8s forwards; }
+        .anim-fly-up { animation: flyUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        .anim-zoom-in { animation: zoomIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+        @keyframes fadeIn { from { opacity: 0; visibility: visible; } to { opacity: 1; visibility: visible; } }
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes flyUp { from { opacity: 0; transform: translateY(50px); visibility: visible; } to { opacity: 1; transform: translateY(0); visibility: visible; } }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.8); visibility: visible; } to { opacity: 1; transform: scale(1); visibility: visible; } }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Home View -->
+    <div id="home-view" class="flex-1 flex flex-col h-full overflow-y-auto">
+        <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+            <div class="flex items-center gap-3 text-primary">
+                <i data-lucide="monitor-play" class="w-8 h-8"></i>
+                <h1 class="text-2xl font-bold text-gray-900">Simple Present</h1>
+            </div>
+            <button onclick="createNewPresentation()" class="bg-primary hover:bg-primaryHover text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-sm">
+                <i data-lucide="plus" class="w-5 h-5"></i> Blank Presentation
+            </button>
+        </header>
+
+        <main class="max-w-6xl mx-auto w-full px-6 py-10 space-y-12">
+            <!-- Templates Section -->
+            <section>
+                <h2 class="text-xl font-semibold mb-6 text-gray-800">Start from a template</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div onclick="createNewPresentation('template-modern')" class="group cursor-pointer">
+                        <div class="aspect-video bg-white border border-gray-200 rounded-xl mb-3 overflow-hidden group-hover:border-primary transition-colors flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+                            <span class="text-blue-500 font-bold text-xl">Modern</span>
+                        </div>
+                        <p class="font-medium text-gray-700 group-hover:text-primary">Modern Pitch</p>
+                    </div>
+                    <div onclick="createNewPresentation('template-dark')" class="group cursor-pointer">
+                        <div class="aspect-video bg-gray-900 border border-gray-200 rounded-xl mb-3 overflow-hidden group-hover:border-primary transition-colors flex items-center justify-center">
+                            <span class="text-white font-bold text-xl">Dark Mode</span>
+                        </div>
+                        <p class="font-medium text-gray-700 group-hover:text-primary">Dark Analytics</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recent Presentations -->
+            <section>
+                <h2 class="text-xl font-semibold mb-6 text-gray-800">Recent Presentations</h2>
+                <div id="recent-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Editor View (Hidden by default) -->
+    <div id="editor-view" class="flex-1 flex flex-col h-full hidden">
+        
+        <!-- Editor Header -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 flex-shrink-0">
+            <div class="flex items-center gap-4">
+                <button onclick="goToHome()" class="p-2 hover:bg-gray-100 rounded-lg text-primary transition-colors" title="Back to Home">
+                    <i data-lucide="monitor-play" class="w-6 h-6"></i>
+                </button>
+                <input type="text" id="presentation-title" value="Untitled Presentation" class="text-lg font-medium bg-transparent border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none px-1 py-0.5 transition-colors" onchange="saveState()">
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <div class="flex bg-gray-100 p-1 rounded-lg mr-4">
+                    <button onclick="addText()" class="p-2 hover:bg-white rounded shadow-sm text-gray-700 transition-all" title="Add Text"><i data-lucide="type" class="w-4 h-4"></i></button>
+                    <button onclick="addShape('rect')" class="p-2 hover:bg-white rounded shadow-sm text-gray-700 transition-all" title="Add Rectangle"><i data-lucide="square" class="w-4 h-4"></i></button>
+                    <button onclick="addShape('circle')" class="p-2 hover:bg-white rounded shadow-sm text-gray-700 transition-all" title="Add Circle"><i data-lucide="circle" class="w-4 h-4"></i></button>
+                    <button onclick="addShape('triangle')" class="p-2 hover:bg-white rounded shadow-sm text-gray-700 transition-all" title="Add Triangle"><i data-lucide="triangle" class="w-4 h-4"></i></button>
+                    <label class="p-2 hover:bg-white rounded shadow-sm text-gray-700 transition-all cursor-pointer" title="Add Image">
+                        <i data-lucide="image" class="w-4 h-4"></i>
+                        <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                    </label>
+                </div>
+                <button onclick="startPresentation()" class="bg-gray-900 hover:bg-gray-800 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors">
+                    <i data-lucide="play" class="w-4 h-4"></i> Present
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <div class="flex flex-1 overflow-hidden">
+            
+            <!-- Left Sidebar: Thumbnails -->
+            <aside class="w-48 bg-gray-50 border-r border-gray-200 flex flex-col flex-shrink-0">
+                <div class="p-3 border-b border-gray-200">
+                    <button onclick="addSlide()" class="w-full py-2 bg-white border border-gray-300 hover:bg-gray-50 rounded text-sm font-medium flex justify-center items-center gap-2 transition-colors">
+                        <i data-lucide="plus" class="w-4 h-4"></i> New Slide
+                    </button>
+                </div>
+                <div id="thumbnails-container" class="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
+                    <!-- Thumbnails populated by JS -->
+                </div>
+            </aside>
+
+            <!-- Center: Canvas Area -->
+            <main class="flex-1 bg-canvas overflow-auto relative flex justify-center items-center" id="canvas-scroll-area">
+                <div id="main-canvas" class="slide-canvas" onclick="handleCanvasClick(event)">
+                    <!-- Slide elements go here -->
+                </div>
+            </main>
+
+            <!-- Right Sidebar: Properties & Animations (FIXED LAYOUT) -->
+            <aside id="right-sidebar" class="w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 hidden">
+                <div class="flex border-b border-gray-200">
+                    <button id="tab-design" onclick="switchTab('design')" class="flex-1 py-3 text-sm font-medium border-b-2 border-primary text-primary">Design</button>
+                    <button id="tab-animate" onclick="switchTab('animate')" class="flex-1 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Animate</button>
+                </div>
+
+                <!-- Design Panel -->
+                <div id="panel-design" class="flex-1 overflow-y-auto p-5 space-y-6">
+                    <!-- Slide Settings (When nothing is selected) -->
+                    <div id="slide-settings">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Slide Settings</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
+                                <input type="color" id="slide-bg-color" onchange="updateSlideBackground(this.value)" class="w-full h-8 cursor-pointer rounded border border-gray-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Transition</label>
+                                <select id="slide-transition" onchange="updateSlideTransition(this.value)" class="w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <option value="none">None</option>
+                                    <option value="trans-fade">Fade</option>
+                                    <option value="trans-slide">Slide Right</option>
+                                </select>
+                            </div>
+                            <button onclick="deleteSlide()" class="w-full py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded text-sm font-medium transition-colors">
+                                Delete Slide
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Element Settings (When element is selected) -->
+                    <div id="element-settings" class="hidden">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Element Style</h3>
+                        
+                        <!-- Text Controls -->
+                        <div id="text-controls" class="space-y-4 hidden mb-4 pb-4 border-b border-gray-100">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
+                                <input type="color" id="text-color" onchange="updateElementStyle('color', this.value)" class="w-full h-8 cursor-pointer rounded border border-gray-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Font Size (px)</label>
+                                <input type="number" id="font-size" onchange="updateElementStyle('fontSize', this.value + 'px')" class="w-full border border-gray-300 rounded-md py-1 px-3 text-sm">
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="toggleTextStyle('fontWeight', 'bold', 'normal')" class="p-1.5 border rounded hover:bg-gray-50"><i data-lucide="bold" class="w-4 h-4"></i></button>
+                                <button onclick="toggleTextStyle('fontStyle', 'italic', 'normal')" class="p-1.5 border rounded hover:bg-gray-50"><i data-lucide="italic" class="w-4 h-4"></i></button>
+                                <button onclick="toggleTextStyle('textDecoration', 'underline', 'none')" class="p-1.5 border rounded hover:bg-gray-50"><i data-lucide="underline" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Shape Controls -->
+                        <div id="shape-controls" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Fill Color</label>
+                                <input type="color" id="element-bg-color" onchange="updateElementStyle('backgroundColor', this.value)" class="w-full h-8 cursor-pointer rounded border border-gray-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Opacity</label>
+                                <input type="range" id="element-opacity" min="0" max="1" step="0.1" onchange="updateElementStyle('opacity', this.value)" class="w-full">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 pt-4 border-t border-gray-100 space-y-3">
+                            <button onclick="changeZIndex(1)" class="w-full py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded text-gray-700 flex items-center justify-center gap-2">
+                                <i data-lucide="arrow-up" class="w-4 h-4"></i> Bring Forward
+                            </button>
+                            <button onclick="changeZIndex(-1)" class="w-full py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded text-gray-700 flex items-center justify-center gap-2">
+                                <i data-lucide="arrow-down" class="w-4 h-4"></i> Send Backward
+                            </button>
+                            <button onclick="deleteSelectedElement()" class="w-full py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded text-sm font-medium transition-colors mt-2">
+                                Delete Element
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Animate Panel -->
+                <div id="panel-animate" class="flex-1 overflow-y-auto p-5 hidden">
+                     <div id="anim-empty-state" class="text-center text-gray-500 text-sm py-10">
+                        Select an element on the canvas to add an entrance animation.
+                     </div>
+                     <div id="anim-controls" class="hidden space-y-4">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Entrance Animation</h3>
+                        <div>
+                            <select id="element-animation" onchange="updateElementAnimation(this.value)" class="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="none">None</option>
+                                <option value="anim-fade-in">Fade In</option>
+                                <option value="anim-fly-up">Fly Up</option>
+                                <option value="anim-zoom-in">Zoom In</option>
+                            </select>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Animations play sequentially when you press Spacebar or Right Arrow during the presentation.</p>
+                     </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Presentation Mode Wrapper -->
+    <div id="presentation-mode">
+        <div id="presentation-canvas"></div>
+        <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full flex gap-4 text-sm z-50 transition-opacity opacity-0 hover:opacity-100" id="present-controls">
+            <button onclick="prevSlide(event)"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+            <span id="present-counter">1 / 1</span>
+            <button onclick="nextSlideOrAnimate(event)"><i data-lucide="arrow-right" class="w-5 h-5"></i></button>
+            <button onclick="exitPresentation(event)" class="ml-4"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+    </div>
+
+    <script>
+        // Data Structures
+        let presentations = JSON.parse(localStorage.getItem('simplePresent_all')) || {};
+        let currentPresentationId = null;
+        let currentPresentation = null;
+        let currentSlideIndex = 0;
+        let selectedElementId = null;
+        
+        // Dragging State
+        let isDragging = false;
+        let isResizing = false;
+        let startX, startY, initialX, initialY, initialW, initialH;
+        let draggedElement = null;
+        
+        // Presentation State
+        let isPresenting = false;
+        let currentAnimStep = 0;
+        let animatableElements = [];
+
+        // Templates
+        const templates = {
+            'template-modern': {
+                title: "Modern Pitch",
+                slides: [
+                    { id: 's1', bg: '#f8fafc', transition: 'trans-fade', elements: [
+                        { id: 'e1', type: 'text', content: 'Modern\nPitch Deck', x: 100, y: 150, width: 400, height: 120, style: { fontSize: '48px', fontWeight: 'bold', color: '#0f172a' }, anim: 'anim-fly-up' },
+                        { id: 'e2', type: 'text', content: 'Presented by Your Name', x: 100, y: 300, width: 300, height: 50, style: { fontSize: '20px', color: '#64748b' }, anim: 'anim-fade-in' },
+                        { id: 'e3', type: 'shape', shapeType: 'circle', x: 600, y: 100, width: 250, height: 250, style: { backgroundColor: '#3b82f6', opacity: '0.1' } }
+                    ]},
+                    { id: 's2', bg: '#ffffff', transition: 'trans-slide', elements: [
+                        { id: 'e4', type: 'text', content: 'The Problem', x: 50, y: 50, width: 300, height: 60, style: { fontSize: '32px', fontWeight: 'bold' } },
+                        { id: 'e5', type: 'shape', shapeType: 'rect', x: 50, y: 150, width: 400, height: 200, style: { backgroundColor: '#fee2e2' }, anim: 'anim-zoom-in' }
+                    ]}
+                ]
+            },
+            'template-dark': {
+                title: "Dark Analytics",
+                slides: [
+                    { id: 's1', bg: '#0f172a', transition: 'trans-fade', elements: [
+                        { id: 'e1', type: 'text', content: 'Q3 Analytics', x: 150, y: 200, width: 660, height: 100, style: { fontSize: '56px', fontWeight: 'bold', color: '#ffffff', textAlign: 'center' } }
+                    ]}
+                ]
+            }
+        };
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Navigation & Storage
+        function initApp() {
+            // Check for active session
+            const activeId = localStorage.getItem('simplePresent_activeSession');
+            if (activeId && presentations[activeId]) {
+                openPresentation(activeId);
+            } else {
+                renderHome();
+            }
+        }
+
+        function renderHome() {
+            document.getElementById('home-view').classList.remove('hidden');
+            document.getElementById('editor-view').classList.add('hidden');
+            localStorage.removeItem('simplePresent_activeSession');
+            
+            const grid = document.getElementById('recent-grid');
+            grid.innerHTML = '';
+            
+            const keys = Object.keys(presentations).sort((a,b) => presentations[b].lastModified - presentations[a].lastModified);
+            
+            if (keys.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">No recent presentations. Create a new one above!</p>';
+                return;
+            }
+
+            keys.forEach(id => {
+                const p = presentations[id];
+                const date = new Date(p.lastModified).toLocaleDateString();
+                const card = document.createElement('div');
+                card.className = 'group cursor-pointer relative';
+                card.innerHTML = `
+                    <div onclick="openPresentation('${id}')" class="aspect-video bg-white border border-gray-200 rounded-xl mb-3 flex items-center justify-center overflow-hidden group-hover:border-primary transition-colors shadow-sm">
+                        <i data-lucide="file-presentation" class="w-12 h-12 text-gray-300 group-hover:text-primary transition-colors"></i>
+                    </div>
+                    <p class="font-medium text-gray-800 truncate pr-8">${p.title}</p>
+                    <p class="text-xs text-gray-500">${date}</p>
+                    <button onclick="deletePresentation(event, '${id}')" class="absolute bottom-1 right-0 p-2 text-gray-400 hover:text-red-500 transition-colors">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function createNewPresentation(templateId = null) {
+            const id = 'pres_' + Date.now();
+            let newPres = {
+                id: id,
+                title: "Untitled Presentation",
+                lastModified: Date.now(),
+                slides: [{ id: 'slide_' + Date.now(), bg: '#ffffff', transition: 'none', elements: [] }]
+            };
+
+            if (templateId && templates[templateId]) {
+                newPres = JSON.parse(JSON.stringify(templates[templateId])); // Deep copy
+                newPres.id = id;
+                newPres.lastModified = Date.now();
+            }
+
+            presentations[id] = newPres;
+            saveAllPresentations();
+            openPresentation(id);
+        }
+
+        function openPresentation(id) {
+            currentPresentationId = id;
+            currentPresentation = presentations[id];
+            localStorage.setItem('simplePresent_activeSession', id);
+            
+            document.getElementById('home-view').classList.add('hidden');
+            document.getElementById('editor-view').classList.remove('hidden');
+            
+            document.getElementById('presentation-title').value = currentPresentation.title;
+            
+            // Adjust canvas scale for editor
+            scaleCanvas();
+            window.addEventListener('resize', scaleCanvas);
+            
+            selectSlide(0);
+            updateSidebar(); // Show right sidebar
+        }
+
+        function goToHome() {
+            saveState();
+            currentPresentation = null;
+            currentPresentationId = null;
+            window.removeEventListener('resize', scaleCanvas);
+            renderHome();
+        }
+
+        function saveAllPresentations() {
+            localStorage.setItem('simplePresent_all', JSON.stringify(presentations));
+        }
+
+        function saveState() {
+            if (!currentPresentation) return;
+            currentPresentation.title = document.getElementById('presentation-title').value;
+            currentPresentation.lastModified = Date.now();
+            presentations[currentPresentationId] = currentPresentation;
+            saveAllPresentations();
+            renderThumbnails();
+        }
+
+        function deletePresentation(e, id) {
+            e.stopPropagation();
+            if(confirm("Delete this presentation?")) {
+                delete presentations[id];
+                saveAllPresentations();
+                renderHome();
+            }
+        }
+
+        function addSlide() {
+            const newSlide = { id: 'slide_' + Date.now(), bg: '#ffffff', transition: 'none', elements: [] };
+            currentPresentation.slides.push(newSlide);
+            selectSlide(currentPresentation.slides.length - 1);
+            saveState();
+        }
+
+        function selectSlide(index) {
+            currentSlideIndex = index;
+            selectedElementId = null;
+            renderCanvas();
+            renderThumbnails();
+            updateSidebar();
+        }
+
+        function deleteSlide() {
+            if (currentPresentation.slides.length <= 1) return alert("Cannot delete the last slide.");
+            currentPresentation.slides.splice(currentSlideIndex, 1);
+            currentSlideIndex = Math.max(0, currentSlideIndex - 1);
+            selectSlide(currentSlideIndex);
+            saveState();
+        }
+
+        function renderThumbnails() {
+            const container = document.getElementById('thumbnails-container');
+            container.innerHTML = '';
+            
+            currentPresentation.slides.forEach((slide, index) => {
+                const thumb = document.createElement('div');
+                thumb.className = `thumbnail-container cursor-pointer p-1 rounded border-2 ${index === currentSlideIndex ? 'active' : 'border-transparent hover:border-gray-300'}`;
+                thumb.onclick = () => selectSlide(index);
+                
+                const num = document.createElement('div');
+                num.className = 'text-xs text-gray-500 mb-1';
+                num.innerText = index + 1;
+                
+                const preview = document.createElement('div');
+                preview.className = 'thumbnail-preview rounded';
+                preview.style.backgroundColor = slide.bg;
+                
+                // Mini rendering of elements (simplified)
+                slide.elements.forEach(el => {
+                    const elPrev = document.createElement('div');
+                    elPrev.style.position = 'absolute';
+                    elPrev.style.left = (el.x / 960 * 100) + '%';
+                    elPrev.style.top = (el.y / 540 * 100) + '%';
+                    elPrev.style.width = (el.width / 960 * 100) + '%';
+                    elPrev.style.height = (el.height / 540 * 100) + '%';
+                    
+                    if (el.type === 'shape') {
+                        elPrev.style.backgroundColor = el.style.backgroundColor || '#cbd5e1';
+                        if(el.shapeType==='circle') elPrev.style.borderRadius = '50%';
+                    } else if (el.type === 'text') {
+                        elPrev.style.backgroundColor = 'rgba(0,0,0,0.1)';
+                    } else if (el.type === 'image') {
+                        elPrev.style.backgroundColor = '#e2e8f0';
+                    }
+                    preview.appendChild(elPrev);
+                });
+                
+                thumb.appendChild(num);
+                thumb.appendChild(preview);
+                container.appendChild(thumb);
+            });
+        }
+
+        function scaleCanvas() {
+            const canvas = document.getElementById('main-canvas');
+            const container = document.getElementById('canvas-scroll-area');
+            if(!canvas || !container) return;
+            
+            // Allow some padding
+            const padding = 40;
+            const scaleX = (container.clientWidth - padding) / 960;
+            const scaleY = (container.clientHeight - padding) / 540;
+            const scale = Math.min(scaleX, scaleY, 1); // Don't scale up past 100% in editor
+            
+            canvas.style.transform = `scale(${scale})`;
+        }
+
+        function renderCanvas() {
+            const canvas = document.getElementById('main-canvas');
+            const slide = currentPresentation.slides[currentSlideIndex];
+            
+            canvas.innerHTML = '';
+            canvas.style.backgroundColor = slide.bg;
+            
+            // Sort by z-index (array order)
+            slide.elements.forEach((el, index) => {
+                const div = document.createElement('div');
+                div.id = el.id;
+                div.className = `canvas-element ${el.id === selectedElementId ? 'selected' : ''}`;
+                div.style.left = el.x + 'px';
+                div.style.top = el.y + 'px';
+                div.style.width = el.width + 'px';
+                div.style.height = el.height + 'px';
+                div.style.zIndex = index + 1;
+                
+                // Apply inline styles
+                if (el.style) {
+                    for (const [key, value] of Object.entries(el.style)) {
+                        div.style[key] = value;
+                    }
+                }
+
+                if (el.type === 'shape') {
+                    if (el.shapeType === 'triangle') {
+                        div.className += ' shape-triangle';
+                        div.style.borderBottomColor = el.style?.backgroundColor || '#cbd5e1';
+                        div.style.backgroundColor = 'transparent';
+                        // Adjust triangle sizing based on container
+                        div.style.borderLeftWidth = (el.width / 2) + 'px';
+                        div.style.borderRightWidth = (el.width / 2) + 'px';
+                        div.style.borderBottomWidth = el.height + 'px';
+                    } else {
+                        div.className += ` shape-${el.shapeType}`;
+                    }
+                } else if (el.type === 'text') {
+                    const textDiv = document.createElement('div');
+                    textDiv.className = 'element-text';
+                    textDiv.innerText = el.content;
+                    textDiv.ondblclick = (e) => {
+                        textDiv.contentEditable = true;
+                        textDiv.focus();
+                    };
+                    textDiv.onblur = (e) => {
+                        textDiv.contentEditable = false;
+                        updateElementData(el.id, { content: textDiv.innerText });
+                    };
+                    div.appendChild(textDiv);
+                } else if (el.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = el.src;
+                    img.className = 'element-image';
+                    div.appendChild(img);
+                }
+
+                div.onmousedown = (e) => startDrag(e, el.id);
+                canvas.appendChild(div);
+            });
+        }
+
+        function addShape(type) {
+            const slide = currentPresentation.slides[currentSlideIndex];
+            slide.elements.push({
+                id: 'el_' + Date.now(),
+                type: 'shape',
+                shapeType: type,
+                x: 380, y: 170, width: 100, height: 100,
+                style: { backgroundColor: '#cbd5e1' }
+            });
+            saveState();
+            renderCanvas();
+        }
+
+        function addText() {
+            const slide = currentPresentation.slides[currentSlideIndex];
+            slide.elements.push({
+                id: 'el_' + Date.now(),
+                type: 'text',
+                content: 'Double-click to edit text',
+                x: 330, y: 220, width: 300, height: 60,
+                style: { fontSize: '24px', color: '#1f2937' }
+            });
+            saveState();
+            renderCanvas();
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    // Compress image using canvas
+                    const maxDim = 800;
+                    let w = img.width;
+                    let h = img.height;
+                    
+                    if (w > maxDim || h > maxDim) {
+                        if (w > h) { h = (maxDim / w) * h; w = maxDim; } 
+                        else { w = (maxDim / h) * w; h = maxDim; }
+                    }
+
+                    const cvs = document.createElement('canvas');
+                    cvs.width = w; cvs.height = h;
+                    const ctx = cvs.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const dataUrl = cvs.toDataURL('image/jpeg', 0.8);
+
+                    currentPresentation.slides[currentSlideIndex].elements.push({
+                        id: 'el_' + Date.now(),
+                        type: 'image',
+                        src: dataUrl,
+                        x: (960 - w/2)/2, y: (540 - h/2)/2, width: w/2, height: h/2
+                    });
+                    saveState();
+                    renderCanvas();
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+            e.target.value = ''; // Reset input
+        }
+
+        function handleCanvasClick(e) {
+            if (e.target.id === 'main-canvas') {
+                selectedElementId = null;
+                renderCanvas();
+                updateSidebar();
+            }
+        }
+
+        function startDrag(e, id) {
+            // Prevent drag if editing text
+            if(e.target.isContentEditable) return;
+
+            e.stopPropagation();
+            selectedElementId = id;
+            updateSidebar();
+            renderCanvas(); // updates selection outline
+
+            draggedElement = document.getElementById(id);
+            const elData = currentPresentation.slides[currentSlideIndex].elements.find(el => el.id === id);
+            
+            // Check if clicking resize handle
+            const rect = draggedElement.getBoundingClientRect();
+            const scale = draggedElement.parentElement.getBoundingClientRect().width / 960; // account for canvas scale
+            
+            // Simplified resize detection (bottom right corner)
+            if (e.clientX > rect.right - 15 && e.clientY > rect.bottom - 15) {
+                isResizing = true;
+            } else {
+                isDragging = true;
+            }
+
+            startX = e.clientX;
+            startY = e.clientY;
+            initialX = elData.x;
+            initialY = elData.y;
+            initialW = elData.width;
+            initialH = elData.height;
+
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        function onDrag(e) {
+            if (!isDragging && !isResizing) return;
+            
+            const scale = document.getElementById('main-canvas').getBoundingClientRect().width / 960;
+            const dx = (e.clientX - startX) / scale;
+            const dy = (e.clientY - startY) / scale;
+            
+            const elData = currentPresentation.slides[currentSlideIndex].elements.find(el => el.id === selectedElementId);
+
+            if (isDragging) {
+                elData.x = initialX + dx;
+                elData.y = initialY + dy;
+            } else if (isResizing) {
+                elData.width = Math.max(20, initialW + dx);
+                elData.height = Math.max(20, initialH + dy);
+            }
+            
+            renderCanvas();
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            isResizing = false;
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            saveState();
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tab-design').className = `flex-1 py-3 text-sm font-medium border-b-2 ${tab === 'design' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`;
+            document.getElementById('tab-animate').className = `flex-1 py-3 text-sm font-medium border-b-2 ${tab === 'animate' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`;
+            
+            document.getElementById('panel-design').classList.toggle('hidden', tab !== 'design');
+            document.getElementById('panel-animate').classList.toggle('hidden', tab !== 'animate');
+        }
+
+        function updateSidebar() {
+            // Unhide sidebar when in editor
+            document.getElementById('right-sidebar').classList.remove('hidden');
+
+            const slide = currentPresentation.slides[currentSlideIndex];
+            const slideSettings = document.getElementById('slide-settings');
+            const elSettings = document.getElementById('element-settings');
+            
+            const animEmpty = document.getElementById('anim-empty-state');
+            const animControls = document.getElementById('anim-controls');
+
+            if (!selectedElementId) {
+                slideSettings.classList.remove('hidden');
+                elSettings.classList.add('hidden');
+                document.getElementById('slide-bg-color').value = slide.bg;
+                document.getElementById('slide-transition').value = slide.transition || 'none';
+                
+                animEmpty.classList.remove('hidden');
+                animControls.classList.add('hidden');
+            } else {
+                slideSettings.classList.add('hidden');
+                elSettings.classList.remove('hidden');
+                
+                const el = slide.elements.find(e => e.id === selectedElementId);
+                
+                document.getElementById('text-controls').classList.toggle('hidden', el.type !== 'text');
+                document.getElementById('shape-controls').classList.toggle('hidden', el.type === 'text'); // show for shape/image
+
+                if (el.type === 'text') {
+                    document.getElementById('text-color').value = el.style.color || '#000000';
+                    document.getElementById('font-size').value = parseInt(el.style.fontSize) || 24;
+                } else {
+                    document.getElementById('element-bg-color').value = el.style.backgroundColor || '#cbd5e1';
+                    document.getElementById('element-opacity').value = el.style.opacity || 1;
+                }
+
+                animEmpty.classList.add('hidden');
+                animControls.classList.remove('hidden');
+                document.getElementById('element-animation').value = el.anim || 'none';
+            }
+        }
+
+        function updateSlideBackground(color) {
+            currentPresentation.slides[currentSlideIndex].bg = color;
+            renderCanvas();
+            renderThumbnails();
+            saveState();
+        }
+
+        function updateSlideTransition(val) {
+            currentPresentation.slides[currentSlideIndex].transition = val;
+            saveState();
+        }
+
+        function updateElementStyle(prop, value) {
+            if (!selectedElementId) return;
+            const el = currentPresentation.slides[currentSlideIndex].elements.find(e => e.id === selectedElementId);
+            if(!el.style) el.style = {};
+            
+            if(el.type === 'shape' && el.shapeType === 'triangle' && prop === 'backgroundColor') {
+                 el.style.backgroundColor = value; // Saved conceptually, applied to border in render
+            } else {
+                 el.style[prop] = value;
+            }
+           
+            renderCanvas();
+            saveState();
+        }
+
+        function toggleTextStyle(prop, onValue, offValue) {
+            if (!selectedElementId) return;
+            const el = currentPresentation.slides[currentSlideIndex].elements.find(e => e.id === selectedElementId);
+            if(!el.style) el.style = {};
+            el.style[prop] = el.style[prop] === onValue ? offValue : onValue;
+            renderCanvas();
+            saveState();
+        }
+
+        function updateElementAnimation(val) {
+             if (!selectedElementId) return;
+             const el = currentPresentation.slides[currentSlideIndex].elements.find(e => e.id === selectedElementId);
+             el.anim = val === 'none' ? null : val;
+             saveState();
+        }
+
+        function updateElementData(id, data) {
+            const el = currentPresentation.slides[currentSlideIndex].elements.find(e => e.id === id);
+            Object.assign(el, data);
+            saveState();
+        }
+
+        function changeZIndex(dir) {
+            if (!selectedElementId) return;
+            const slide = currentPresentation.slides[currentSlideIndex];
+            const idx = slide.elements.findIndex(e => e.id === selectedElementId);
+            if ((dir > 0 && idx === slide.elements.length - 1) || (dir < 0 && idx === 0)) return;
+            
+            const el = slide.elements.splice(idx, 1)[0];
+            slide.elements.splice(idx + dir, 0, el);
+            renderCanvas();
+            saveState();
+        }
+
+        function deleteSelectedElement() {
+            if (!selectedElementId) return;
+            const slide = currentPresentation.slides[currentSlideIndex];
+            slide.elements = slide.elements.filter(e => e.id !== selectedElementId);
+            selectedElementId = null;
+            renderCanvas();
+            updateSidebar();
+            saveState();
+        }
+
+        function startPresentation() {
+            isPresenting = true;
+            document.getElementById('presentation-mode').classList.add('active');
+            
+            // Native Fullscreen if supported (with error handling for iframes/permissions)
+            const elem = document.documentElement;
+            try {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(err => console.warn("Fullscreen denied by browser policy:", err));
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen();
+                }
+            } catch (err) {
+                console.warn("Fullscreen API error:", err);
+            }
+
+            window.addEventListener('resize', scalePresentationCanvas);
+            document.addEventListener('keydown', handlePresKeys);
+            
+            renderPresentationSlide(currentSlideIndex);
+        }
+
+        function scalePresentationCanvas() {
+            const canvas = document.getElementById('presentation-canvas');
+            if(!canvas) return;
+            
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            
+            // Presentation canvas is technically 1920x1080 internally, scale it to fit screen
+            const scaleX = winW / 1920;
+            const scaleY = winH / 1080;
+            const scale = Math.min(scaleX, scaleY);
+            
+            canvas.style.transform = `scale(${scale})`;
+        }
+
+        function renderPresentationSlide(index) {
+            const canvas = document.getElementById('presentation-canvas');
+            const slide = currentPresentation.slides[index];
+            
+            canvas.innerHTML = '';
+            canvas.className = ''; // reset classes
+            
+            // Apply Transition
+            if (slide.transition && slide.transition !== 'none') {
+                canvas.classList.add(slide.transition);
+                // Remove class after animation to allow re-trigger
+                setTimeout(() => canvas.classList.remove(slide.transition), 500); 
+            }
+
+            canvas.style.backgroundColor = slide.bg;
+            
+            animatableElements = [];
+            currentAnimStep = 0;
+
+            // Render elements scaled up x2 (960x540 -> 1920x1080)
+            slide.elements.forEach(el => {
+                const div = document.createElement('div');
+                div.style.position = 'absolute';
+                div.style.left = (el.x * 2) + 'px';
+                div.style.top = (el.y * 2) + 'px';
+                div.style.width = (el.width * 2) + 'px';
+                div.style.height = (el.height * 2) + 'px';
+                
+                if (el.style) {
+                    for (const [key, value] of Object.entries(el.style)) {
+                        if(key === 'fontSize') {
+                            div.style[key] = (parseInt(value) * 2) + 'px';
+                        } else {
+                            div.style[key] = value;
+                        }
+                    }
+                }
+
+                if (el.type === 'shape') {
+                    if (el.shapeType === 'triangle') {
+                        div.style.width = '0'; div.style.height = '0';
+                        div.style.borderLeft = `${el.width}px solid transparent`;
+                        div.style.borderRight = `${el.width}px solid transparent`;
+                        div.style.borderBottom = `${el.height * 2}px solid ${el.style?.backgroundColor || '#cbd5e1'}`;
+                        div.style.backgroundColor = 'transparent';
+                    } else {
+                        div.style.backgroundColor = el.style.backgroundColor || '#cbd5e1';
+                        if(el.shapeType === 'circle') div.style.borderRadius = '50%';
+                    }
+                } else if (el.type === 'text') {
+                    div.innerText = el.content;
+                    div.style.whiteSpace = 'pre-wrap';
+                } else if (el.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = el.src;
+                    img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+                    div.appendChild(img);
+                }
+
+                // Handle Animations
+                if (el.anim) {
+                    div.classList.add('anim-hidden'); // Hide initially
+                    animatableElements.push({ element: div, animClass: el.anim });
+                }
+
+                canvas.appendChild(div);
+            });
+
+            document.getElementById('present-counter').innerText = `${index + 1} / ${currentPresentation.slides.length}`;
+            scalePresentationCanvas();
+        }
+
+        function nextSlideOrAnimate(e) {
+            if(e) e.stopPropagation();
+            
+            if (currentAnimStep < animatableElements.length) {
+                // Play next animation
+                const item = animatableElements[currentAnimStep];
+                item.element.classList.remove('anim-hidden');
+                item.element.classList.add(item.animClass);
+                currentAnimStep++;
+            } else {
+                // Next slide
+                if (currentSlideIndex < currentPresentation.slides.length - 1) {
+                    currentSlideIndex++;
+                    renderPresentationSlide(currentSlideIndex);
+                }
+            }
+        }
+
+        function prevSlide(e) {
+            if(e) e.stopPropagation();
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                renderPresentationSlide(currentSlideIndex);
+            }
+        }
+
+        function handlePresKeys(e) {
+            if (!isPresenting) return;
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+                nextSlideOrAnimate();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            } else if (e.key === 'Escape') {
+                exitPresentation();
+            }
+        }
+
+        function exitPresentation(e) {
+            if(e) e.stopPropagation();
+            isPresenting = false;
+            document.getElementById('presentation-mode').classList.remove('active');
+            window.removeEventListener('resize', scalePresentationCanvas);
+            document.removeEventListener('keydown', handlePresKeys);
+            
+            if (document.exitFullscreen) document.exitFullscreen().catch(err=>console.log(err));
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            
+            // Re-render editor to reset layout
+            selectSlide(currentSlideIndex);
+            scaleCanvas();
+        }
+
+        // Initialize on load
+        window.onload = initApp;
+    </script>
+</body>
+</html>
