@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie tap simulator v1.0</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a24;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            box-sizing: border-box;
+            padding-top: 15px;
+            padding-bottom: 15px;
+        }
+
+        /* Top tip banner */
+        .tip-banner {
+            background: rgba(255, 204, 0, 0.15);
+            border: 1px solid #ffcc00;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: #fffae6;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Main game layout wrapper */
+        .game-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 50px;
+            width: 100%;
+            max-width: 950px;
+            padding: 0 20px;
+        }
+
+        /* Center area (Score + Epic Cookie) */
+        .center-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        #score {
+            font-size: 2.8rem;
+            font-weight: 900;
+            color: #ffcc00;
+            margin-bottom: 5px;
+            text-shadow: 0 3px 8px rgba(0,0,0,0.5);
+        }
+
+        #cps {
+            font-size: 1.1rem;
+            color: #00ffcc;
+            margin-bottom: 25px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+
+        .cookie-container {
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Epic Cookie SVG Styling */
+        svg {
+            width: 280px;
+            height: 280px;
+            transition: transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            filter: drop-shadow(0 15px 25px rgba(0,0,0,0.7));
+        }
+
+        svg:active {
+            transform: scale(0.88) rotate(-3deg);
+        }
+
+        /* Upgrade Shop Panel (Right side) */
+        .upgrade-panel {
+            background: #252538;
+            border: 2px solid #3e3e5c;
+            border-radius: 12px;
+            padding: 20px;
+            width: 260px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .upgrade-panel h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.2rem;
+            color: #ffcc00;
+            border-bottom: 1px solid #3e3e5c;
+            padding-bottom: 8px;
+        }
+
+        .upgrade-btn {
+            background: #e67e22;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .upgrade-btn span {
+            font-size: 0.8rem;
+            color: #fce1a9;
+            font-weight: normal;
+        }
+
+        .upgrade-btn:hover:not(:disabled) {
+            background: #d35400;
+            transform: translateY(-2px);
+        }
+
+        .upgrade-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .upgrade-btn:disabled {
+            background: #44445c;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .upgrade-btn:disabled span {
+            color: #aaa;
+        }
+
+        /* Floating numbers when clicking */
+        .floating-text {
+            position: absolute;
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #00ffcc;
+            pointer-events: none;
+            animation: floatUp 0.6s ease-out forwards;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.6);
+        }
+
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-70px) scale(1.3);
+            }
+        }
+
+        /* Bottom watermark/version text */
+        .footer-version {
+            font-size: 0.85rem;
+            color: #8888a0;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Tip header on top -->
+    <div class="tip-banner">
+        💡 <strong>Tip:</strong> Use ben music at background for better experience!
+    </div>
+
+    <!-- Main game content area holding the cookie and upgrade panel -->
+    <div class="game-wrapper">
+        <div class="center-area">
+            <div id="score">Cookies: 0</div>
+            <div id="cps">per second: 0</div>
+
+            <div class="cookie-container" id="cookieContainer">
+                <!-- Banned for copyright reasons: Reason - using assets from Real life. (Totally an EPIC cookie now) -->
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Outer Glowing Aura / Crust -->
+                    <circle cx="100" cy="100" r="92" fill="#c07322" stroke="#6d390a" stroke-width="5"/>
+                    <circle cx="100" cy="100" r="84" fill="#e6953b"/>
+                    
+                    <!-- Swirl details to make it look extra spicy & epic -->
+                    <path d="M 60 70 Q 100 40 140 70" stroke="#f4b163" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.6"/>
+                    <path d="M 50 120 Q 100 160 150 120" stroke="#b05b10" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+                    <!-- Massive Chunks of Chocolate & Space Gems -->
+                    <polygon points="65,55 85,50 90,75 60,80" fill="#3b1706" stroke="#210d03" stroke-width="2"/>
+                    <polygon points="130,50 150,65 140,90 115,75" fill="#3b1706" stroke="#210d03" stroke-width="2"/>
+                    <polygon points="95,100 125,95 135,125 100,135" fill="#3b1706" stroke="#210d03" stroke-width="2"/>
+                    <polygon points="50,110 75,105 80,135 55,140" fill="#3b1706" stroke="#210d03" stroke-width="2"/>
+                    <polygon points="115,145 145,140 150,165 120,170" fill="#3b1706" stroke="#210d03" stroke-width="2"/>
+                    
+                    <!-- Little shiny highlight spots -->
+                    <circle cx="78" cy="65" r="3" fill="#ffb86c" opacity="0.8"/>
+                    <circle cx="130" cy="70" r="3" fill="#ffb86c" opacity="0.8"/>
+                    <circle cx="112" cy="115" r="4" fill="#ffb86c" opacity="0.8"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Upgrade Shop sidebar -->
+        <div class="upgrade-panel">
+            <h3>Upgrades</h3>
+            <button class="upgrade-btn" id="clickUpgradeBtn" onclick="buyClickUpgrade()">
+                ⚡ Extra Finger (+1/click)
+                <span id="clickUpgradeCost">Cost: 15 cookies</span>
+            </button>
+            <button class="upgrade-btn" id="grandmaUpgradeBtn" onclick="buyGrandmaUpgrade()">
+                👵 Grandma (+1 cookie/sec)
+                <span id="grandmaUpgradeCost">Cost: 100 cookies (Owned: 0)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom text required by user -->
+    <div class="footer-version">Cookie tap simulator v1.0</div>
+
+    <script>
+        // Track how many cookies the player has amassed
+        let currentCookies = 0;
+        
+        // How many cookies you get per click (can be upgraded!)
+        let cookiesPerClick = 1;
+        
+        // Auto-generation tracking variables
+        let cookiesPerSecond = 0;
+        let grandmasOwned = 0;
+        
+        // Price tags for the shop items
+        let clickUpgradeCost = 15;
+        let grandmaUpgradeCost = 100;
+
+        // Grab references to DOM elements so we can update them on the fly
+        const scoreDisplay = document.getElementById('score');
+        const cpsDisplay = document.getElementById('cps');
+        const cookieContainer = document.getElementById('cookieContainer');
+        const clickUpgradeBtn = document.getElementById('clickUpgradeBtn');
+        const clickUpgradeCostDisplay = document.getElementById('clickUpgradeCost');
+        const grandmaUpgradeBtn = document.getElementById('grandmaUpgradeBtn');
+        const grandmaUpgradeCostDisplay = document.getElementById('grandmaUpgradeCost');
+
+        // Main clicking action handler
+        cookieContainer.addEventListener('click', (e) => {
+            // Increment score based on current upgrade power
+            currentCookies += cookiesPerClick;
+            updateScoreDisplay();
+
+            // Spawn floating text right where the user clicked the cookie
+            const rect = cookieContainer.getBoundingClientRect();
+            const clickX = e.clientX - rect.left - (rect.width / 2);
+            const clickY = e.clientY - rect.top - (rect.height / 2);
+
+            const floatingNotification = document.createElement('div');
+            floatingNotification.className = 'floating-text';
+            floatingNotification.textContent = `+${cookiesPerClick}`;
+            floatingNotification.style.left = `calc(50% + ${clickX}px)`;
+            floatingNotification.style.top = `calc(50% + ${clickY}px)`;
+
+            cookieContainer.appendChild(floatingNotification);
+
+            // Clean up the floating animation element after it finishes playing
+            setTimeout(() => {
+                floatingNotification.remove();
+            }, 600);
+        });
+
+        // Function triggered when buying the click power upgrade
+        function buyClickUpgrade() {
+            if (currentCookies >= clickUpgradeCost) {
+                // Deduct cost and boost power
+                currentCookies -= clickUpgradeCost;
+                cookiesPerClick += 1;
+                
+                // Scale up the price exponentially so it doesn't break balance too fast
+                clickUpgradeCost = Math.floor(clickUpgradeCost * 1.6);
+
+                // Refresh UI text elements
+                updateScoreDisplay();
+                clickUpgradeCostDisplay.textContent = `Cost: ${clickUpgradeCost} cookies`;
+            }
+        }
+
+        // Function triggered when hiring a sweet old grandma
+        function buyGrandmaUpgrade() {
+            if (currentCookies >= grandmaUpgradeCost) {
+                // Pay up and hire the grandma
+                currentCookies -= grandmaUpgradeCost;
+                grandmasOwned += 1;
+                cookiesPerSecond += 1;
+
+                // Make grandmas progressively pricier to keep the game challenging
+                grandmaUpgradeCost = Math.floor(grandmaUpgradeCost * 1.15);
+
+                // Refresh UI text elements
+                updateScoreDisplay();
+                grandmaUpgradeCostDisplay.textContent = `Cost: ${grandmaUpgradeCost} cookies (Owned: ${grandmasOwned})`;
+            }
+        }
+
+        // Game loop running every second to passively harvest cookies via grandmas
+        setInterval(() => {
+            if (cookiesPerSecond > 0) {
+                currentCookies += cookiesPerSecond;
+                updateScoreDisplay();
+            }
+        }, 1000);
+
+        // Keeps the scoreboard, CPS counter, and button active states synced up
+        function updateScoreDisplay() {
+            scoreDisplay.textContent = `Cookies: ${Math.floor(currentCookies)}`;
+            cpsDisplay.textContent = `per second: ${cookiesPerSecond}`;
+
+            // Gray out the click upgrade button if player is too broke
+            if (currentCookies >= clickUpgradeCost) {
+                clickUpgradeBtn.removeAttribute('disabled');
+            } else {
+                clickUpgradeBtn.setAttribute('disabled', 'true');
+            }
+
+            // Gray out the grandma button if player can't afford her yet
+            if (currentCookies >= grandmaUpgradeCost) {
+                grandmaUpgradeBtn.removeAttribute('disabled');
+            } else {
+                grandmaUpgradeBtn.setAttribute('disabled', 'true');
+            }
+        }
+    </script>
+
+</body>
+</html>
