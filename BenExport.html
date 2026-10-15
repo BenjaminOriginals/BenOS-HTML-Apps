@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BenExport</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --panel2:#f0f1f4; --line:rgba(0,0,0,.09); --text:#1c1c1e; --dim:#6e6e76;
+  --accent:#0a84ff; --accent2:#5e6bff; --accent-fg:#fff; --hover:rgba(0,0,0,.045); --ok:#24b25b; --warn:#e8892b; --err:#e5383b;
+  --shadow:0 6px 20px rgba(0,0,0,.12);
+}
+:root[data-benos-theme="dark"]{
+  --bg:#17181c; --panel:#1f2025; --panel2:#272830; --line:rgba(255,255,255,.1); --text:#f2f2f5; --dim:#9a9aa5;
+  --hover:rgba(255,255,255,.06); --shadow:0 6px 20px rgba(0,0,0,.5);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-benos-theme="light"]):not([data-benos-theme="dark"]){
+    --bg:#17181c; --panel:#1f2025; --panel2:#272830; --line:rgba(255,255,255,.1); --text:#f2f2f5; --dim:#9a9aa5;
+    --hover:rgba(255,255,255,.06); --shadow:0 6px 20px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+
+/* header */
+header{display:flex;align-items:center;gap:12px;padding:14px 18px 10px}
+.logo{width:40px;height:40px;border-radius:10px;flex:0 0 auto;display:grid;place-items:center;background:linear-gradient(150deg,var(--accent),var(--accent2));box-shadow:0 4px 12px rgba(10,132,255,.35)}
+.logo svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+header h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+header p{margin:0;color:var(--dim);font-size:12.5px}
+.spacer{flex:1}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;color:var(--dim)}
+.ghost:hover{background:var(--hover);color:var(--text)}
+
+/* toolbar */
+.toolbar{display:flex;gap:8px;align-items:center;padding:0 18px 10px;flex-wrap:wrap}
+.search{flex:1 1 180px;min-width:140px;position:relative}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--dim);fill:none;stroke-width:2;stroke-linecap:round}
+.search input{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px 8px 32px;outline:none}
+.search input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(10,132,255,.18)}
+select{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:none}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:13px}
+.chip:hover{background:var(--hover)}
+
+/* tree */
+main{flex:1;min-height:0;margin:0 18px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:auto}
+.row{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 8px;border-bottom:1px solid transparent;user-select:none}
+.row:hover{background:var(--hover)}
+.row .caret{width:18px;height:18px;flex:0 0 auto;display:grid;place-items:center;border-radius:5px;color:var(--dim);background:none;border:0;padding:0}
+.row .caret:hover{background:var(--hover)}
+.row .caret svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;transition:transform .12s}
+.row.open>.caret svg{transform:rotate(90deg)}
+.row .nocaret{width:18px;flex:0 0 auto}
+.row input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--accent);flex:0 0 auto;cursor:pointer}
+.row .ic{width:22px;height:22px;flex:0 0 auto}
+.row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.row .meta{color:var(--dim);font-size:12px;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.row.dir .nm{font-weight:600}
+.row.nodata .nm{opacity:.55}
+.empty{padding:40px 20px;text-align:center;color:var(--dim)}
+.empty b{display:block;color:var(--text);font-size:15px;margin-bottom:4px}
+
+/* footer */
+footer{padding:12px 18px 16px;display:flex;flex-direction:column;gap:10px}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sum{flex:1 1 160px;min-width:140px}
+.sum b{font-size:14px}
+.sum small{display:block;color:var(--dim);font-size:12px}
+.seg{display:inline-flex;background:var(--panel2);border-radius:9px;padding:3px;gap:2px}
+.seg button{background:none;border:0;border-radius:7px;padding:5px 11px;font-size:12.5px;color:var(--dim)}
+.seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.18);font-weight:600}
+.go{background:linear-gradient(150deg,var(--accent),var(--accent2));color:var(--accent-fg);border:0;border-radius:10px;padding:9px 18px;font-weight:700;box-shadow:0 4px 12px rgba(10,132,255,.3);display:inline-flex;gap:7px;align-items:center}
+.go:disabled{opacity:.4;box-shadow:none;cursor:default}
+.go svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.prog{height:6px;border-radius:4px;background:var(--panel2);overflow:hidden;display:none}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .12s}
+.status{font-size:12.5px;color:var(--dim);min-height:18px}
+.status.ok{color:var(--ok)} .status.err{color:var(--err)} .status.warn{color:var(--warn)}
+
+/* blocking message */
+.block{position:fixed;inset:0;background:var(--bg);display:none;place-items:center;text-align:center;padding:30px;z-index:5}
+.block.show{display:grid}
+.block div{max-width:380px}
+.block h2{margin:0 0 6px;font-size:18px}
+.block p{margin:0;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4.5 14.5v2.5a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3v-2.5"/></svg></div>
+  <div>
+    <h1>BenExport</h1>
+    <p>Send files from BenOS to your computer</p>
+  </div>
+  <div class="spacer"></div>
+  <button class="ghost" id="refresh" title="Re-read the files in BenOS">Refresh</button>
+</header>
+
+<div class="toolbar">
+  <label class="search">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.2"/><path d="M19.5 19.5l-3.9-3.9"/></svg>
+    <input id="q" type="search" placeholder="Search files" autocomplete="off" spellcheck="false">
+  </label>
+  <select id="kind" title="Filter by type">
+    <option value="all">All types</option>
+    <option value="txt">Documents &amp; text</option>
+    <option value="image">Pictures</option>
+    <option value="audio">Music &amp; audio</option>
+    <option value="video">Videos</option>
+    <option value="pdf">PDFs</option>
+    <option value="app">Apps (.html)</option>
+    <option value="other">Other</option>
+  </select>
+  <button class="chip" id="selAll">Select all</button>
+  <button class="chip" id="selNone">Clear</button>
+</div>
+
+<main id="tree"></main>
+
+<footer>
+  <div class="bar">
+    <div class="sum"><b id="sumMain">Nothing selected</b><small id="sumSub">Tick files or folders to export them</small></div>
+    <div class="seg" id="mode" title="How the files are delivered">
+      <button data-m="zip" class="on">One ZIP</button>
+      <button data-m="files">Separate files</button>
+    </div>
+    <button class="go" id="go" disabled>
+      <svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M4.5 17v1.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V17"/></svg>
+      Export
+    </button>
+  </div>
+  <div class="prog" id="prog"><i></i></div>
+  <div class="status" id="status"></div>
+</footer>
+
+<div class="block" id="block"><div><h2 id="blockT"></h2><p id="blockP"></p></div></div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- BenOS file system access ----------
+   Apps run in a same-origin iframe, so the app can reach BenOS's own FS object.
+   If that is ever unavailable we fall back to reading BenOS's saved storage directly (read-only). */
+let nodes=[], byParent=new Map(), byId=new Map();
+
+function getHostFS(){
+  try{ const f=parent.eval('FS'); if(f && f.nodes && typeof f.nodes.values==='function') return f; }catch(e){}
+  return null;
+}
+function readIDB(){
+  return new Promise(res=>{
+    try{
+      if(!indexedDB || !indexedDB.databases) return res(null);
+      indexedDB.databases().then(list=>{
+        if(!list.some(d=>d.name==='BenOS_HTML')) return res(null);
+        const rq=indexedDB.open('BenOS_HTML');
+        rq.onupgradeneeded=e=>{ try{ e.target.transaction.abort(); }catch(_){} };   // never create/alter the database
+        rq.onerror=()=>res(null);
+        rq.onsuccess=()=>{
+          try{
+            const db=rq.result; const g=db.transaction('fs','readonly').objectStore('fs').getAll();
+            g.onsuccess=()=>{ db.close(); res(g.result||[]); };
+            g.onerror=()=>{ db.close(); res(null); };
+          }catch(e){ res(null); }
+        };
+      }).catch(()=>res(null));
+    }catch(e){ res(null); }
+  });
+}
+function readLocal(){
+  try{ const a=JSON.parse(localStorage.getItem('benos_fs')||'null'); return Array.isArray(a)?a:null; }catch(e){ return null; }
+}
+async function loadNodes(){
+  const f=getHostFS();
+  let all=f?[...f.nodes.values()]:null;
+  if(!all) all=await readIDB();
+  if(!all) all=readLocal();
+  return all;
+}
+function isSystemApp(n){
+  if(n.systemApp) return true;
+  if(n.type==='app' && !n.storeAppId && typeof n.content==='string' && n.content.indexOf('<!-- BenOS system application')===0) return true;
+  return false;
+}
+function index(all){
+  byParent=new Map(); byId=new Map();
+  const skip=new Set(['trash']);
+  all.forEach(n=>{ byId.set(n.id,n); });
+  nodes=all.filter(n=>n.id!=='root' && !isSystemApp(n) && !skip.has(n.id));
+  nodes.forEach(n=>{ const p=n.parentId; if(!byParent.has(p)) byParent.set(p,[]); byParent.get(p).push(n); });
+}
+const isDir=n=>n.type==='folder';
+function sizeOf(n){
+  if(n.size && typeof n.size==='number' && n.size>0) return n.size;
+  return typeof n.content==='string'?n.content.length:0;
+}
+function fmtSize(b){
+  if(b<1024) return b+' B';
+  const u=['KB','MB','GB','TB']; let i=-1;
+  do{ b/=1024; i++; }while(b>=1024&&i<u.length-1);
+  return (b>=100?b.toFixed(0):b>=10?b.toFixed(1):b.toFixed(2)).replace(/\.?0+$/,'')+' '+u[i];
+}
+function ext(name){ const i=name.lastIndexOf('.'); return i<0?'':name.slice(i+1).toLowerCase(); }
+function kindOf(n){
+  if(n.type==='app' || (n.storeAppId)) return 'app';
+  const k=n.kind;
+  if(k==='txt'||k==='image'||k==='audio'||k==='video'||k==='pdf') return k;
+  const e=ext(n.name);
+  if(e==='html'||e==='htm') return 'txt';
+  return 'other';
+}
+const hasData=n=>typeof n.content==='string' && (n.content.length>0 || sizeOf(n)===0);
+
+/* ---------- state ---------- */
+const state={ q:'', kind:'all', open:new Set(), sel:new Set(), mode:'zip', busy:false };
+
+function matches(n){
+  if(isDir(n)) return false;
+  if(state.kind!=='all' && kindOf(n)!==state.kind) return false;
+  if(state.q && n.name.toLowerCase().indexOf(state.q)<0) return false;
+  return true;
+}
+const filtering=()=>!!state.q || state.kind!=='all';
+function kids(id){
+  const a=(byParent.get(id)||[]).slice();
+  a.sort((x,y)=>(isDir(y)-isDir(x)) || x.name.localeCompare(y.name,undefined,{numeric:true,sensitivity:'base'}));
+  return a;
+}
+/* matching files under a folder (memoised per render) */
+let memo=new Map();
+function filesUnder(id){
+  if(memo.has(id)) return memo.get(id);
+  const out=[];
+  (byParent.get(id)||[]).forEach(c=>{ if(isDir(c)) filesUnder(c.id).forEach(x=>out.push(x)); else if(matches(c)) out.push(c); });
+  memo.set(id,out); return out;
+}
+function folderVisible(n){
+  if(!filtering()) return true;
+  return filesUnder(n.id).length>0;
+}
+
+/* ---------- rendering ---------- */
+const CARET='<svg viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg>';
+const FOLDER='<svg class="ic" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.7c.6 0 1.2.3 1.6.8l.9 1.2h6.8A2.5 2.5 0 0 1 20.9 9.5v7A2.5 2.5 0 0 1 18.4 19H5.5A2.5 2.5 0 0 1 3 16.5z" fill="#4ea3ff"/></svg>';
+const KCOL={txt:'#8e9bb0',image:'#34c76f',audio:'#ff5fa8',video:'#b36bff',pdf:'#ff5a52',app:'#ffa53d',other:'#9aa0ab'};
+function fileIcon(n){
+  const c=KCOL[kindOf(n)]||KCOL.other;
+  return '<svg class="ic" viewBox="0 0 24 24"><path d="M6.5 3h7.2L19 8.3V19a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="'+c+'"/><path d="M13.5 3v4a1.5 1.5 0 0 0 1.5 1.5h4" fill="rgba(255,255,255,.38)"/></svg>';
+}
+function render(){
+  memo=new Map();
+  const host=$('#tree'); const top=host.scrollTop;
+  const rows=[]; let shown=0;
+  (function walk(pid,depth){
+    kids(pid).forEach(n=>{
+      const pad='style="padding-left:'+(8+depth*18)+'px"';
+      if(isDir(n)){
+        if(!folderVisible(n)) return;
+        const f=filesUnder(n.id); const selN=f.filter(x=>state.sel.has(x.id)).length;
+        const open=state.open.has(n.id)||(filtering()&&f.length>0);
+        const hasKids=(byParent.get(n.id)||[]).length>0;
+        shown++;
+        rows.push('<div class="row dir'+(open?' open':'')+'" '+pad+' data-id="'+esc(n.id)+'">'+
+          (hasKids?'<button class="caret" data-act="tog" aria-label="Expand">'+CARET+'</button>':'<span class="nocaret"></span>')+
+          '<input type="checkbox" data-act="selDir" data-st="'+(f.length&&selN===f.length?'all':selN?'some':'none')+'"'+(f.length?'':' disabled')+' aria-label="Select folder">'+
+          FOLDER+'<span class="nm" data-act="tog">'+esc(n.name)+'</span>'+
+          '<span class="meta">'+(f.length?(selN?selN+' of ':'')+f.length+' file'+(f.length>1?'s':''):'empty')+'</span></div>');
+        if(open) walk(n.id,depth+1);
+      }else{
+        if(!matches(n)) return;
+        shown++;
+        const ok=hasData(n);
+        rows.push('<div class="row file'+(ok?'':' nodata')+'" '+pad+' data-id="'+esc(n.id)+'" title="'+esc(FSpath(n))+(ok?'':' (no data to export)')+'">'+
+          '<span class="nocaret"></span>'+
+          '<input type="checkbox" data-act="selFile"'+(state.sel.has(n.id)?' checked':'')+(ok?'':' disabled')+' aria-label="Select file">'+
+          fileIcon(n)+'<span class="nm" data-act="selFile">'+esc(n.name)+'</span>'+
+          '<span class="meta">'+fmtSize(sizeOf(n))+'</span></div>');
+      }
+    });
+  })('root',0);
+  host.innerHTML=rows.length?rows.join(''):'<div class="empty"><b>'+(filtering()?'No matching files':'No files to export')+'</b>'+(filtering()?'Try a different search or type.':'Create or import some files in BenOS first.')+'</div>';
+  host.querySelectorAll('input[data-st]').forEach(i=>{ const s=i.dataset.st; i.checked=s==='all'; i.indeterminate=s==='some'; });
+  host.scrollTop=top;
+  updateSummary();
+}
+function FSpath(n){
+  const parts=[]; let c=n;
+  while(c && c.id!=='root'){ parts.unshift(c.name); c=byId.get(c.parentId); }
+  return parts.join('/');
+}
+function selectedNodes(){ return [...state.sel].map(id=>byId.get(id)).filter(Boolean); }
+function updateSummary(){
+  const s=selectedNodes(); const bytes=s.reduce((a,n)=>a+sizeOf(n),0);
+  $('#sumMain').textContent=s.length?s.length+' file'+(s.length>1?'s':'')+' selected':'Nothing selected';
+  $('#sumSub').textContent=s.length?fmtSize(bytes)+' · '+(state.mode==='zip'?'folders are kept inside the ZIP':'each file downloads on its own'):'Tick files or folders to export them';
+  $('#go').disabled=!s.length||state.busy;
+}
+
+/* ---------- events ---------- */
+$('#tree').addEventListener('click',e=>{
+  const row=e.target.closest('.row'); if(!row) return;
+  const id=row.dataset.id, n=byId.get(id); if(!n||state.busy) return;
+  const act=(e.target.closest('[data-act]')||{dataset:{}}).dataset.act;
+  if(act==='tog'){ state.open.has(id)?state.open.delete(id):state.open.add(id); render(); }
+  else if(act==='selFile'){
+    if(e.target.tagName==='INPUT'){ e.target.checked?state.sel.add(id):state.sel.delete(id); updateSummary(); }
+    else if(hasData(n)){ state.sel.has(id)?state.sel.delete(id):state.sel.add(id); render(); }
+  }
+  else if(act==='selDir'){
+    const f=filesUnder(id).filter(hasData); const all=f.every(x=>state.sel.has(x.id));
+    f.forEach(x=>all?state.sel.delete(x.id):state.sel.add(x.id));
+    render();
+  }
+  else if(isDir(n)){ state.open.has(id)?state.open.delete(id):state.open.add(id); render(); }
+  else if(hasData(n)){ state.sel.has(id)?state.sel.delete(id):state.sel.add(id); render(); }
+});
+$('#q').addEventListener('input',e=>{ state.q=e.target.value.trim().toLowerCase(); render(); });
+$('#kind').addEventListener('change',e=>{ state.kind=e.target.value; render(); });
+$('#selAll').onclick=()=>{ filesUnder('root').filter(hasData).forEach(n=>state.sel.add(n.id)); render(); };
+$('#selNone').onclick=()=>{ state.sel.clear(); render(); };
+$('#mode').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b||state.busy) return;
+  state.mode=b.dataset.m; [...$('#mode').children].forEach(x=>x.classList.toggle('on',x===b)); updateSummary();
+});
+$('#refresh').onclick=()=>reload(true);
+window.addEventListener('focus',()=>{ if(!state.busy) reload(false); });
+
+/* live detection: BenOS folders/files can be created, renamed, moved or deleted at any time,
+   so watch a cheap fingerprint of the file system and re-read the moment it changes */
+function fingerprint(){
+  const f=getHostFS(); if(!f) return null;
+  let c=0,m=0,l=0;
+  f.nodes.forEach(n=>{ c++; m+=(+n.modified||0); l+=(n.name?n.name.length:0)+(n.parentId?n.parentId.length:0); });
+  return c+':'+m+':'+l;
+}
+let lastFP=null;
+setInterval(()=>{
+  if(state.busy||document.hidden) return;
+  const fp=fingerprint();
+  if(fp===null){ return; }                       // no live link: Refresh button / focus still work
+  if(fp!==lastFP){ lastFP=fp; reload(false); }
+},800);
+setInterval(()=>{ if(!state.busy && fingerprint()===null) reload(false); },4000);   // fallback storage readers
+
+let lastSig=null;
+function sigOf(all){ let m=0,l=0; all.forEach(n=>{ m+=(+n.modified||0); l+=(n.name?n.name.length:0)+(n.parentId?n.parentId.length:0)+(n.id?n.id.length:0); }); return all.length+':'+m+':'+l; }
+async function reload(announce){
+  const all=await loadNodes();
+  if(all && !announce && sigOf(all)===lastSig) return;      // nothing changed: don't redraw (a redraw mid-click would swallow the click)
+  if(!all){ block('Can’t reach BenOS files','BenExport couldn’t read your files. Try closing and reopening the app.'); return; }
+  $('#block').classList.remove('show');
+  index(all);
+  [...state.sel].forEach(id=>{ if(!byId.has(id)) state.sel.delete(id); });      // deleted files drop out of the selection
+  [...state.open].forEach(id=>{ if(!byId.has(id)) state.open.delete(id); });    // deleted folders forget their expanded state
+  lastFP=fingerprint(); lastSig=sigOf(all);
+  render();
+  if(announce) setStatus('File list refreshed.','');
+}
+function block(t,p){ $('#blockT').textContent=t; $('#blockP').textContent=p; $('#block').classList.add('show'); }
+function setStatus(t,cls){ const s=$('#status'); s.textContent=t; s.className='status'+(cls?' '+cls:''); }
+function setProg(p){ const w=$('#prog'); w.style.display=p==null?'none':'block'; if(p!=null) w.firstElementChild.style.width=Math.round(p*100)+'%'; }
+
+/* ---------- bytes + download ---------- */
+function bytesOf(n){
+  const c=n.content;
+  if(typeof c!=='string') return new Uint8Array(0);
+  if(c.slice(0,5)==='data:'){
+    const i=c.indexOf(','); const meta=c.slice(5,i), body=c.slice(i+1);
+    if(/;base64/i.test(meta)){
+      const bin=atob(body); const u=new Uint8Array(bin.length);
+      for(let k=0;k<bin.length;k++) u[k]=bin.charCodeAt(k);
+      return u;
+    }
+    return new TextEncoder().encode(decodeURIComponent(body));
+  }
+  return new TextEncoder().encode(c);
+}
+function mimeOf(n){
+  if(n.mime) return n.mime;
+  const m={txt:'text/plain',html:'text/html',htm:'text/html',json:'application/json',csv:'text/csv',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',svg:'image/svg+xml',mp3:'audio/mpeg',wav:'audio/wav',mp4:'video/mp4',pdf:'application/pdf'};
+  return m[ext(n.name)]||'application/octet-stream';
+}
+function saveBlob(blob,name){
+  let P=window;
+  try{ if(parent && parent.document && parent.URL) P=parent; }catch(e){}   // BenOS itself starts the download (sandboxed frames can't)
+  const url=P.URL.createObjectURL(blob);
+  const a=P.document.createElement('a'); a.href=url; a.download=name; a.style.display='none';
+  P.document.body.appendChild(a); a.click();
+  setTimeout(()=>{ try{ a.remove(); P.URL.revokeObjectURL(url); }catch(_){} },120000);
+}
+const tick=()=>new Promise(r=>setTimeout(r,0));
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const safe=s=>String(s).replace(/[\\\/:*?"<>|\u0000-\u001f]/g,'_').replace(/^\.+$/,'_')||'_';
+
+/* ---------- minimal ZIP writer (no compression, UTF-8 names) ---------- */
+const CRC=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(u){ let c=0xFFFFFFFF; for(let i=0;i<u.length;i++) c=CRC[(c^u[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function dosTime(d){ return {t:(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1), d:(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())}; }
+function zipBuilder(){
+  const parts=[], central=[]; let offset=0, count=0; const enc=new TextEncoder();
+  return {
+    add(path,data,date){
+      const name=enc.encode(path), crc=crc32(data), dt=dosTime(date||new Date());
+      const h=new DataView(new ArrayBuffer(30));
+      h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(6,0x0800,true); h.setUint16(8,0,true);
+      h.setUint16(10,dt.t,true); h.setUint16(12,dt.d,true); h.setUint32(14,crc,true);
+      h.setUint32(18,data.length,true); h.setUint32(22,data.length,true); h.setUint16(26,name.length,true); h.setUint16(28,0,true);
+      parts.push(h.buffer,name,data);
+      const c=new DataView(new ArrayBuffer(46));
+      c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(8,0x0800,true); c.setUint16(10,0,true);
+      c.setUint16(12,dt.t,true); c.setUint16(14,dt.d,true); c.setUint32(16,crc,true);
+      c.setUint32(20,data.length,true); c.setUint32(24,data.length,true); c.setUint16(28,name.length,true);
+      c.setUint16(30,0,true); c.setUint16(32,0,true); c.setUint16(34,0,true); c.setUint16(36,0,true); c.setUint32(38,0,true); c.setUint32(42,offset,true);
+      central.push(c.buffer,name);
+      offset+=30+name.length+data.length; count++;
+    },
+    finish(){
+      let size=0; central.forEach(b=>size+=b.byteLength!==undefined?b.byteLength:b.length);
+      const e=new DataView(new ArrayBuffer(22));
+      e.setUint32(0,0x06054b50,true); e.setUint16(4,0,true); e.setUint16(6,0,true);
+      e.setUint16(8,count,true); e.setUint16(10,count,true); e.setUint32(12,size,true); e.setUint32(16,offset,true); e.setUint16(20,0,true);
+      return new Blob([...parts,...central,e.buffer],{type:'application/zip'});
+    },
+    get count(){ return count; }, get bytes(){ return offset; }
+  };
+}
+
+/* ---------- export ---------- */
+async function doExport(){
+  const list=selectedNodes().filter(hasData);
+  if(!list.length||state.busy) return;
+  state.busy=true; updateSummary(); setProg(0); setStatus('Preparing…','');
+  const failed=[]; let done=0, totalBytes=0;
+  try{
+    if(state.mode==='zip'){
+      if(list.length>65000) throw new Error('That’s too many files for one ZIP. Export in smaller batches.');
+      const z=zipBuilder(); const used=new Set();
+      for(const n of list){
+        let path=FSpath(n).split('/').map(safe).join('/');
+        if(used.has(path.toLowerCase())){
+          const i=path.lastIndexOf('.'); const base=i>path.lastIndexOf('/')+1?path.slice(0,i):path, e=i>path.lastIndexOf('/')+1?path.slice(i):'';
+          let k=2; while(used.has((base+' ('+k+')'+e).toLowerCase())) k++; path=base+' ('+k+')'+e;
+        }
+        used.add(path.toLowerCase());
+        try{ const u=bytesOf(n); z.add(path,u,n.modified?new Date(n.modified):new Date()); totalBytes+=u.length; }
+        catch(err){ failed.push(n.name); }
+        done++; setProg(done/list.length*0.95); setStatus('Packing '+done+' of '+list.length+'…','');
+        if(done%4===0) await tick();
+      }
+      if(z.bytes>4e9) throw new Error('The ZIP would be larger than 4 GB. Export in smaller batches.');
+      if(!z.count) throw new Error('None of the selected files could be read.');
+      const d=new Date(), stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      saveBlob(z.finish(),'BenOS Export '+stamp+'.zip');
+      setProg(1);
+    }else{
+      const used=new Set();
+      for(const n of list){
+        try{
+          const u=bytesOf(n); let name=safe(n.name);
+          if(used.has(name.toLowerCase())){
+            const i=name.lastIndexOf('.'); const base=i>0?name.slice(0,i):name, e=i>0?name.slice(i):''; let k=2;
+            while(used.has((base+' ('+k+')'+e).toLowerCase())) k++; name=base+' ('+k+')'+e;
+          }
+          used.add(name.toLowerCase());
+          saveBlob(new Blob([u],{type:mimeOf(n)}),name); totalBytes+=u.length;
+        }catch(err){ failed.push(n.name); }
+        done++; setProg(done/list.length); setStatus('Sending '+done+' of '+list.length+'…','');
+        await wait(350);      // small gap so the browser accepts every download
+      }
+    }
+    const okN=list.length-failed.length;
+    if(failed.length) setStatus('Exported '+okN+' file'+(okN===1?'':'s')+' ('+fmtSize(totalBytes)+'). Couldn’t read: '+failed.slice(0,3).join(', ')+(failed.length>3?' and '+(failed.length-3)+' more':'')+'.','warn');
+    else setStatus('Done. '+okN+' file'+(okN===1?'':'s')+' ('+fmtSize(totalBytes)+') sent to your computer. Check your Downloads folder.','ok');
+  }catch(err){
+    setProg(null); setStatus((err&&err.message)||'Export failed.','err');
+  }
+  setTimeout(()=>setProg(null),1200);
+  state.busy=false; updateSummary();
+}
+$('#go').onclick=doExport;
+
+/* follow the BenOS light/dark appearance (the bridge also sets data-benos-theme for us) */
+window.addEventListener('benos-theme',()=>{});
+
+reload(false);
+})();
+</script>
+</body>
+</html>
